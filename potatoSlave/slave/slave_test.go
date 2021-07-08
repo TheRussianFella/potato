@@ -108,7 +108,7 @@ func TestPstring(t *testing.T) {
 func TestPlist(t *testing.T) {
 
 	// Create a slave
-	testPort := "62554"
+	testPort := "62553"
 	s := NewSlave("localhost", testPort, time.Second, time.Minute)
 
 	// Client simulator

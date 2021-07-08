@@ -1,0 +1,16 @@
+version: "2"
+
+services:
+  app:
+    image: golang:1.16-alpine
+    volumes:
+      - .:/go/src
+    working_dir: /go/src
+    ports:
+      - "65000:65000"
+    command: go run main.go
+    environment:
+      PORT: "65000"
+      IP: "localhost"
+      STALETIME: 2
+      DEFAULTTTL: 60
