@@ -2,7 +2,6 @@ package slave
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"time"
 )
@@ -27,7 +26,6 @@ func (s *PotatoSlave) StartServing() {
 		}
 		name, _ := s.authConnection(c)
 		s.handleConnection(c, name)
-		fmt.Println("done")
 	}
 }
 
@@ -109,6 +107,22 @@ func setStatus(mes *ResponseMessage, code uint) {
 
 //////////////////////////
 
+///// Data independent Functions
+
+func (s *PotatoSlave) del(userID string, mes CommandMessage) ResponseMessage {
+
+	var response ResponseMessage
+
+	if len(mes.Arguments) != 1 {
+		setStatus(&response, _WA)
+	} else {
+		delete(s.storage[userID], mes.Arguments[0])
+		setStatus(&response, _OK)
+	}
+
+	return response
+}
+
 // TODO: get rid of the boilerplate in here...
 
 //// String functions
@@ -177,23 +191,32 @@ func (s *PotatoSlave) lpush(userID string, mes CommandMessage) ResponseMessage {
 		setStatus(&response, _WA)
 	} else {
 
+		// Key exist and it's of the right type
 		if val, ok := s.storage[userID][mes.Arguments[0]]; ok {
-			val.setContent(mes.Arguments[1], "-1")
+
+			switch val.(type) {
+			case *plist:
+
+				s.storage[userID][mes.Arguments[0]].setContent(mes.Arguments[1], "-1")
+				setStatus(&response, _OK)
+				return response
+
+			default:
+			}
+
+		}
+
+		var ttl time.Duration
+
+		if mes.TTL != 0 {
+			ttl = mes.TTL
 		} else {
+			ttl = s.DEFAULTTTL
+		}
 
-			var ttl time.Duration
-
-			if mes.TTL != 0 {
-				ttl = mes.TTL
-			} else {
-				ttl = s.DEFAULTTTL
-			}
-
-			s.storage[userID][mes.Arguments[0]] = &plist{
-				list:        []string{mes.Arguments[1]},
-				timeOfDeath: time.Now().Add(ttl),
-			}
-
+		s.storage[userID][mes.Arguments[0]] = &plist{
+			list:        []string{mes.Arguments[1]},
+			timeOfDeath: time.Now().Add(ttl),
 		}
 		setStatus(&response, _OK)
 	}

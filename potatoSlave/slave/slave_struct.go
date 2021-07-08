@@ -51,6 +51,7 @@ func NewSlave(IP string, port string, STALETIME time.Duration, DEFAULTTTL time.D
 	s.functions["LGET"] = s.lget
 	s.functions["LSET"] = s.lset
 	s.functions["LPUSH"] = s.lpush
+	s.functions["DEL"] = s.del
 
 	return &s
 }

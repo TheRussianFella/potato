@@ -163,6 +163,63 @@ func TestPlist(t *testing.T) {
 			t.Errorf("Got wrong value after LSET.")
 		}
 
+		// Check that deletion works
+		mes = CommandMessage{
+			Name:      "DEL",
+			Arguments: []string{"mylist"},
+		}
+		encoder.Encode(mes)
+		decoder.Decode(&response)
+
+		if response.Code != _OK {
+			t.Errorf("Got %s on deletion", response.StatusMessage)
+		}
+		if _, ok := s.storage["user"]["mylist"]; ok {
+			t.Errorf("Deletion didn't work")
+		}
+
+		s.stop = true
+	}(testPort, s, t)
+
+	// Start serving
+	s.StartServing()
+}
+
+func TestKeyReusage(t *testing.T) {
+
+	// Create a slave
+	testPort := "62553"
+	s := NewSlave("localhost", testPort, time.Second, time.Minute)
+
+	// Client simulator
+	go func(testPort string, s *PotatoSlave, t *testing.T) {
+
+		encoder, decoder, response := newClient(testPort)
+
+		encoder.Encode(CommandMessage{
+			Name:      "SET",
+			Arguments: []string{"key", "value"},
+			TTL:       time.Minute,
+		})
+		decoder.Decode(&response)
+
+		encoder.Encode(CommandMessage{
+			Name:      "LPUSH",
+			Arguments: []string{"key", "1"},
+			TTL:       time.Minute,
+		})
+		decoder.Decode(&response)
+
+		encoder.Encode(CommandMessage{
+			Name:      "LGET",
+			Arguments: []string{"key", "0"},
+		})
+		decoder.Decode(&response)
+
+		if response.Code != _OK || response.Value != "1" {
+			t.Errorf("Different type writing didn't go as planned. message: %s, Value: %s", response.StatusMessage, response.Value)
+		}
+
 		s.stop = true
 	}(testPort, s, t)
 
