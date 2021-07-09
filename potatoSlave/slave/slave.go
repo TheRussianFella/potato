@@ -2,6 +2,7 @@ package slave
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"time"
 )
@@ -19,7 +20,13 @@ func (s *PotatoSlave) StartServing() {
 	}
 	defer listener.Close()
 
+	// ttl checker
+	shutdownChan := make(chan bool)
+	go ttlCheckRoutine(shutdownChan, s.storage, s.CLEANUPTIME)
+	////
+
 	for i := s.numToServ; i != 0; i-- {
+
 		c, err := listener.Accept()
 		if err != nil {
 			panic(err)
@@ -41,6 +48,42 @@ func (s *PotatoSlave) StartServing() {
 			})
 		}
 	}
+
+	// Kill ttl checker
+	shutdownChan <- true
+
+	// Wait for all serving routines to finish
+	for i := 0; i < s.NUMWORKERS; i++ {
+		<-s.availableWorkers
+	}
+}
+
+// ttlCheckRoutine deletes keys that are expired until stopped by someone.
+// TODO: currently all keys are checked at each checkup - it's clearly
+// O(keys) which is unscalable.
+func ttlCheckRoutine(shutdownChan chan bool, storage map[string]map[string]potat, cleanup time.Duration) {
+
+	for {
+
+		time.Sleep(cleanup)
+
+		for user := range storage {
+			for key := range storage[user] {
+				fmt.Println(storage[user][key].getTimeOfDeath())
+				if storage[user][key].getTimeOfDeath().Before(time.Now()) {
+					delete(storage[user], key)
+				}
+			}
+		}
+
+		select {
+		case <-shutdownChan:
+			return
+		case <-time.After(time.Second):
+			continue
+		}
+	}
+
 }
 
 // CommandMessage is a structure that describes command messages sent by a client
@@ -139,6 +182,24 @@ func (s *PotatoSlave) del(userID string, mes CommandMessage) ResponseMessage {
 	return response
 }
 
+func (s *PotatoSlave) keys(userID string, mes CommandMessage) ResponseMessage {
+
+	var response ResponseMessage
+
+	if len(mes.Arguments) != 0 {
+		setStatus(&response, _WA)
+	} else {
+		ans := ""
+		for k := range s.storage["user"] {
+			ans += "'" + k + "',"
+		}
+		response.Value = ans
+		setStatus(&response, _OK)
+	}
+
+	return response
+}
+
 // TODO: get rid of the boilerplate in here...
 
 //// String functions
@@ -146,10 +207,11 @@ func (s *PotatoSlave) del(userID string, mes CommandMessage) ResponseMessage {
 func (s *PotatoSlave) get(userID string, mes CommandMessage) ResponseMessage {
 
 	var response ResponseMessage
-
 	if len(mes.Arguments) != 1 {
 		setStatus(&response, _WA)
 	} else {
+
+		s.storageMutex.Lock()
 
 		if val, ok := s.storage[userID][mes.Arguments[0]]; ok {
 
@@ -164,6 +226,8 @@ func (s *PotatoSlave) get(userID string, mes CommandMessage) ResponseMessage {
 		} else {
 			setStatus(&response, _NK)
 		}
+
+		s.storageMutex.Unlock()
 	}
 
 	return response
@@ -178,6 +242,8 @@ func (s *PotatoSlave) set(userID string, mes CommandMessage) ResponseMessage {
 		setStatus(&response, _WA)
 	} else {
 
+		s.storageMutex.Lock()
+
 		delete(s.storage[userID], mes.Arguments[0])
 
 		if mes.TTL != 0 {
@@ -190,6 +256,9 @@ func (s *PotatoSlave) set(userID string, mes CommandMessage) ResponseMessage {
 			content:     mes.Arguments[1],
 			timeOfDeath: time.Now().Add(ttl),
 		}
+
+		s.storageMutex.Unlock()
+
 		setStatus(&response, _OK)
 	}
 

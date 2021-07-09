@@ -3,6 +3,7 @@ package slave
 import (
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -18,16 +19,20 @@ type PotatoSlave struct {
 	IP   string
 	port string
 
-	STALETIME  time.Duration
-	DEFAULTTTL time.Duration
-	NUMWORKERS int
+	STALETIME   time.Duration
+	DEFAULTTTL  time.Duration
+	CLEANUPTIME time.Duration
+	NUMWORKERS  int
 
 	// Functions - a map that holds invocable functions
 	functions map[string]func(string, CommandMessage) ResponseMessage
 
 	// Data - the structure is a nested map, where first level is a separation by users
 	// (each user's keys are stored in a separate table) and then a data map itself.
-	storage map[string]map[string]potat
+	// TODO: this mutex should be added to all operations with storage, thats
+	// currently not the case.
+	storage      map[string]map[string]potat
+	storageMutex sync.Mutex
 
 	// TODO: This is maximum number of connections that server is allowed to open -
 	// it's just a hack so that we can easily stop the server for the tests
@@ -39,7 +44,7 @@ type PotatoSlave struct {
 }
 
 // NewSlave creates an instance of a PotatoSlave.
-func NewSlave(IP string, port string, STALETIME time.Duration, DEFAULTTTL time.Duration, numToServ int) *PotatoSlave {
+func NewSlave(IP string, port string, STALETIME time.Duration, DEFAULTTTL time.Duration, CLEANUPTIME time.Duration, numToServ int) *PotatoSlave {
 
 	nw := 5
 	s := PotatoSlave{
@@ -47,6 +52,7 @@ func NewSlave(IP string, port string, STALETIME time.Duration, DEFAULTTTL time.D
 		port:             port,
 		STALETIME:        STALETIME,
 		DEFAULTTTL:       DEFAULTTTL,
+		CLEANUPTIME:      CLEANUPTIME,
 		NUMWORKERS:       nw,
 		storage:          make(map[string]map[string]potat),
 		functions:        make(map[string]func(string, CommandMessage) ResponseMessage),
@@ -60,6 +66,7 @@ func NewSlave(IP string, port string, STALETIME time.Duration, DEFAULTTTL time.D
 	s.functions["LSET"] = s.lset
 	s.functions["LPUSH"] = s.lpush
 	s.functions["DEL"] = s.del
+	s.functions["KEYS"] = s.keys
 
 	for i := 0; i < s.NUMWORKERS; i++ {
 		s.availableWorkers <- true

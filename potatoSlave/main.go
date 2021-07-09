@@ -16,6 +16,6 @@ func main() {
 	ttl, _ := strconv.Atoi(os.Getenv("DEFAULTTTL"))
 	defaultttl := time.Second * time.Duration(ttl)
 
-	s := slave.NewSlave(ip, port, staletime, defaultttl)
+	s := slave.NewSlave(ip, port, staletime, defaultttl, time.Second, 1000)
 	s.StartServing()
 }
