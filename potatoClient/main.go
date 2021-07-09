@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"potatoClient/client"
+	"time"
 )
 
 func main() {
@@ -13,6 +14,10 @@ func main() {
 	// String
 	serv.Set("newstr", "value", time.Hour)
 	fmt.Println(serv.Get("newstr"))
+	serv.Set("superstr", "value", time.Hour)
+	fmt.Println(serv.Keys())
+	serv.Del("superstr")
+	fmt.Println(serv.Keys())
 
 	// List
 	serv.Lpush("mylist", "5", time.Hour)
@@ -24,10 +29,14 @@ func main() {
 	serv.Lset("notexistent", 2, "22")
 	serv.Lset("mylist", 100, "22")
 
+	// Map
+	serv.Hset("myhash", "max", "boy", time.Hour)
+	serv.Hset("myhash", "nastya", "girl", time.Hour)
+	fmt.Println(serv.Hget("myhash", "max"))
 	//TTL
 	fmt.Println(serv.Keys())
 	serv.Set("shortLiver", "value", time.Millisecond)
 	fmt.Println(serv.Keys())
-	time.Sleep(100 * time.Second)
+	time.Sleep(time.Second)
 	fmt.Println(serv.Keys())
 }

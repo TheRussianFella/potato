@@ -370,3 +370,77 @@ func (s *PotatoSlave) lget(userID string, mes CommandMessage) ResponseMessage {
 
 	return response
 }
+
+//// Map functions
+
+func (s *PotatoSlave) hget(userID string, mes CommandMessage) ResponseMessage {
+
+	var response ResponseMessage
+
+	if len(mes.Arguments) != 2 {
+		setStatus(&response, _WA)
+	} else {
+		if val, ok := s.storage[userID][mes.Arguments[0]]; ok {
+
+			switch val.(type) {
+			case *pmap:
+				content, err := s.storage[userID][mes.Arguments[0]].getContent(mes.Arguments[1])
+
+				if err != nil {
+					setStatus(&response, _WA)
+				} else {
+					response.Value = content
+					setStatus(&response, _OK)
+				}
+
+			default:
+				setStatus(&response, _WT)
+			}
+		} else {
+			setStatus(&response, _NK)
+		}
+	}
+	return response
+}
+
+func (s *PotatoSlave) hset(userID string, mes CommandMessage) ResponseMessage {
+
+	var response ResponseMessage
+
+	if len(mes.Arguments) != 3 {
+		setStatus(&response, _WA)
+	} else {
+
+		if val, ok := s.storage[userID][mes.Arguments[0]]; ok {
+			switch val.(type) {
+			case *pmap:
+
+				err := s.storage[userID][mes.Arguments[0]].setContent(mes.Arguments[2], mes.Arguments[1])
+
+				if err != nil {
+					setStatus(&response, _WA)
+				} else {
+					setStatus(&response, _OK)
+				}
+				return response
+			default:
+			}
+		}
+
+		var ttl time.Duration
+
+		if mes.TTL != 0 {
+			ttl = mes.TTL
+		} else {
+			ttl = s.DEFAULTTTL
+		}
+
+		s.storage[userID][mes.Arguments[0]] = &pmap{
+			timeOfDeath: time.Now().Add(ttl),
+			ourmap:      map[string]string{mes.Arguments[2]: mes.Arguments[1]},
+		}
+
+	}
+
+	return response
+}

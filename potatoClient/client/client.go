@@ -62,6 +62,16 @@ func (s *Server) Set(key string, value string, ttl time.Duration) {
 	fmt.Println(s.response.StatusMessage)
 }
 
+// Del
+func (s *Server) Del(key string) {
+	s.encoder.Encode(CommandMessage{
+		Name:      "DEL",
+		Arguments: []string{key},
+	})
+	s.decoder.Decode(&s.response)
+	fmt.Println(s.response.StatusMessage)
+}
+
 // Keys
 func (s *Server) Keys() string {
 	s.encoder.Encode(CommandMessage{
@@ -99,6 +109,28 @@ func (s *Server) Lset(key string, position int, val string) {
 	s.encoder.Encode(CommandMessage{
 		Name:      "LSET",
 		Arguments: []string{key, strconv.Itoa(position), val},
+	})
+	s.decoder.Decode(&s.response)
+	fmt.Println(s.response.StatusMessage)
+}
+
+// Hget
+func (s *Server) Hget(key string, innerKey string) string {
+	s.encoder.Encode(CommandMessage{
+		Name:      "HGET",
+		Arguments: []string{key, innerKey},
+	})
+	s.decoder.Decode(&s.response)
+	fmt.Println(s.response.StatusMessage)
+	return s.response.Value
+}
+
+// Hset
+func (s *Server) Hset(key string, innerKey string, val string, ttl time.Duration) {
+	s.encoder.Encode(CommandMessage{
+		Name:      "HSET",
+		Arguments: []string{key, innerKey, val},
+		TTL:       ttl,
 	})
 	s.decoder.Decode(&s.response)
 	fmt.Println(s.response.StatusMessage)

@@ -67,6 +67,8 @@ func NewSlave(IP string, port string, STALETIME time.Duration, DEFAULTTTL time.D
 	s.functions["LPUSH"] = s.lpush
 	s.functions["DEL"] = s.del
 	s.functions["KEYS"] = s.keys
+	s.functions["HGET"] = s.hget
+	s.functions["HSET"] = s.hset
 
 	for i := 0; i < s.NUMWORKERS; i++ {
 		s.availableWorkers <- true
@@ -149,4 +151,28 @@ func (p *plist) setContent(val string, idx string) error {
 	p.list[i] = val
 	return nil
 
+}
+
+///// Map
+
+type pmap struct {
+	ourmap      map[string]string
+	timeOfDeath time.Time
+}
+
+func (p *pmap) getTimeOfDeath() time.Time {
+	return p.timeOfDeath
+}
+
+func (p *pmap) getContent(idx string) (string, error) {
+
+	if el, ok := p.ourmap[idx]; ok {
+		return el, nil
+	}
+	return "", errors.New("nk")
+}
+
+func (p *pmap) setContent(val string, idx string) error {
+	p.ourmap[idx] = val
+	return nil
 }
