@@ -19,13 +19,27 @@ func (s *PotatoSlave) StartServing() {
 	}
 	defer listener.Close()
 
-	for !s.stop {
+	for i := s.numToServ; i != 0; i-- {
 		c, err := listener.Accept()
 		if err != nil {
 			panic(err)
 		}
-		name, _ := s.authConnection(c)
-		s.handleConnection(c, name)
+
+		// Check if there are workers available
+		select {
+		case <-s.availableWorkers:
+
+			name, _ := s.authConnection(c)
+			go s.handleConnection(c, name)
+
+		case <-time.After(time.Second):
+
+			json.NewEncoder(c).Encode(ResponseMessage{
+				Code:          _NW,
+				StatusMessage: statusMessages[_NW],
+				Value:         "",
+			})
+		}
 	}
 }
 
@@ -62,15 +76,15 @@ func (s *PotatoSlave) handleConnection(connection net.Conn, username string) {
 	decoder := json.NewDecoder(connection)
 	encoder := json.NewEncoder(connection)
 	var mes CommandMessage
-
 	for {
 
 		connection.SetReadDeadline(time.Now().Add(s.STALETIME))
 		err := decoder.Decode(&mes)
 
 		if err != nil {
-			//fmt.Println(err)
 			// TODO: check if it's a timeout and then just close the connection
+			// Say that you are available
+			s.availableWorkers <- true
 			return
 		}
 
@@ -91,6 +105,7 @@ const (
 	_WT = iota
 	_NK = iota
 	_WA = iota
+	_NW = iota
 )
 
 var statusMessages = map[uint]string{
@@ -98,6 +113,7 @@ var statusMessages = map[uint]string{
 	_WT: "Object stored at the key is of different type",
 	_NK: "Key doesn't exist",
 	_WA: "Wrong call arguments",
+	_NW: "There are no available workers on the server",
 }
 
 func setStatus(mes *ResponseMessage, code uint) {

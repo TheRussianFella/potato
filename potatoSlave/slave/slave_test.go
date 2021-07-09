@@ -8,40 +8,6 @@ import (
 	"time"
 )
 
-/*
-TODO: Turn it back on when you make a workpool
-func TestStale(t *testing.T) {
-
-	// Create a slave
-	testPort := "62554"
-	staleTime := time.Second
-	s := NewSlave("localhost", testPort, staleTime)
-
-	// Send him a message
-
-	go func(testPort string, s *PotatoSlave, staleTime time.Duration, t *testing.T) {
-
-		time.Sleep(time.Second)
-		conn, err := net.Dial("tcp", "localhost:"+testPort)
-		if err != nil {
-			panic(err)
-		}
-		time.Sleep(staleTime)
-		one := make([]byte, 1)
-		_, err = conn.Read(one)
-
-		if err != nil {
-			t.Errorf("Connection wasn't timed out")
-		}
-		s.stop = true
-	}(testPort, s, staleTime, t)
-
-	// Check them
-	s.StartServing(true)
-	fmt.Println("skidadle")
-}
-*/
-
 func newClient(testPort string) (*json.Encoder, *json.Decoder, ResponseMessage) {
 
 	time.Sleep(time.Second)
@@ -62,7 +28,7 @@ func TestPstring(t *testing.T) {
 
 	// Create a slave
 	testPort := "62554"
-	s := NewSlave("localhost", testPort, time.Second, time.Minute)
+	s := NewSlave("localhost", testPort, time.Second, time.Minute, 1)
 
 	// Client simulator
 	go func(testPort string, s *PotatoSlave, t *testing.T) {
@@ -97,7 +63,6 @@ func TestPstring(t *testing.T) {
 			t.Errorf("Got wrong value from get")
 		}
 
-		s.stop = true
 	}(testPort, s, t)
 
 	// Slave code
@@ -109,7 +74,7 @@ func TestPlist(t *testing.T) {
 
 	// Create a slave
 	testPort := "62553"
-	s := NewSlave("localhost", testPort, time.Second, time.Minute)
+	s := NewSlave("localhost", testPort, time.Second, time.Minute, 1)
 
 	// Client simulator
 	go func(testPort string, s *PotatoSlave, t *testing.T) {
@@ -178,7 +143,6 @@ func TestPlist(t *testing.T) {
 			t.Errorf("Deletion didn't work")
 		}
 
-		s.stop = true
 	}(testPort, s, t)
 
 	// Start serving
@@ -189,7 +153,7 @@ func TestKeyReusage(t *testing.T) {
 
 	// Create a slave
 	testPort := "62553"
-	s := NewSlave("localhost", testPort, time.Second, time.Minute)
+	s := NewSlave("localhost", testPort, time.Second, time.Minute, 1)
 
 	// Client simulator
 	go func(testPort string, s *PotatoSlave, t *testing.T) {
@@ -220,9 +184,46 @@ func TestKeyReusage(t *testing.T) {
 			t.Errorf("Different type writing didn't go as planned. message: %s, Value: %s", response.StatusMessage, response.Value)
 		}
 
-		s.stop = true
 	}(testPort, s, t)
 
 	// Start serving
+	s.StartServing()
+}
+
+func TestMultipleConnections(t *testing.T) {
+
+	// Create a slave
+	testPort := "62553"
+	s := NewSlave("localhost", testPort, time.Second, time.Minute, 2)
+
+	// Client one
+	go func(testPort string, s *PotatoSlave, t *testing.T) {
+
+		encoder, _, _ := newClient(testPort)
+
+		encoder.Encode(CommandMessage{
+			Name:      "SET",
+			Arguments: []string{"key", "value"},
+			TTL:       time.Minute,
+		})
+	}(testPort, s, t)
+
+	// Client two
+	go func(testPort string, s *PotatoSlave, t *testing.T) {
+
+		encoder, decoder, response := newClient(testPort)
+		time.Sleep(time.Second)
+		encoder.Encode(CommandMessage{
+			Name:      "GET",
+			Arguments: []string{"key"},
+		})
+		decoder.Decode(&response)
+
+		if response.Value != "value" {
+			t.Errorf("Got inconsistency with multiple connections")
+		}
+
+	}(testPort, s, t)
+
 	s.StartServing()
 }
