@@ -2,7 +2,6 @@ package slave
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"time"
 )
@@ -69,7 +68,6 @@ func ttlCheckRoutine(shutdownChan chan bool, storage map[string]map[string]potat
 
 		for user := range storage {
 			for key := range storage[user] {
-				fmt.Println(storage[user][key].getTimeOfDeath())
 				if storage[user][key].getTimeOfDeath().Before(time.Now()) {
 					delete(storage[user], key)
 				}

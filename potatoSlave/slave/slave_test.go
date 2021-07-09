@@ -24,7 +24,7 @@ func newClient(testPort string) (*json.Encoder, *json.Decoder, ResponseMessage) 
 	return encoder, decoder, response
 }
 
-func _TestPstring(t *testing.T) {
+func TestPstring(t *testing.T) {
 
 	// Create a slave
 	testPort := "62554"
@@ -70,7 +70,7 @@ func _TestPstring(t *testing.T) {
 
 }
 
-func _TestPlist(t *testing.T) {
+func TestPlist(t *testing.T) {
 
 	// Create a slave
 	testPort := "62553"
@@ -149,7 +149,7 @@ func _TestPlist(t *testing.T) {
 	s.StartServing()
 }
 
-func _TestKeyReusage(t *testing.T) {
+func TestKeyReusage(t *testing.T) {
 
 	// Create a slave
 	testPort := "62553"
@@ -190,7 +190,7 @@ func _TestKeyReusage(t *testing.T) {
 	s.StartServing()
 }
 
-func _TestMultipleConnections(t *testing.T) {
+func TestMultipleConnections(t *testing.T) {
 
 	// Create a slave
 	testPort := "62553"
