@@ -3,6 +3,7 @@ package slave
 import (
 	"encoding/json"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -21,7 +22,7 @@ func (s *PotatoSlave) StartServing() {
 
 	// ttl checker
 	shutdownChan := make(chan bool)
-	go ttlCheckRoutine(shutdownChan, s.storage, s.CLEANUPTIME)
+	go ttlCheckRoutine(shutdownChan, s.storage, s.CLEANUPTIME, &s.storageMutex)
 	////
 
 	for i := s.numToServ; i != 0; i-- {
@@ -60,11 +61,14 @@ func (s *PotatoSlave) StartServing() {
 // ttlCheckRoutine deletes keys that are expired until stopped by someone.
 // TODO: currently all keys are checked at each checkup - it's clearly
 // O(keys) which is unscalable.
-func ttlCheckRoutine(shutdownChan chan bool, storage map[string]map[string]potat, cleanup time.Duration) {
+func ttlCheckRoutine(shutdownChan chan bool, storage map[string]map[string]potat,
+	cleanup time.Duration, mut *sync.Mutex) {
 
 	for {
 
 		time.Sleep(cleanup)
+
+		mut.Lock()
 
 		for user := range storage {
 			for key := range storage[user] {
@@ -73,6 +77,8 @@ func ttlCheckRoutine(shutdownChan chan bool, storage map[string]map[string]potat
 				}
 			}
 		}
+
+		mut.Unlock()
 
 		select {
 		case <-shutdownChan:
@@ -102,10 +108,15 @@ type ResponseMessage struct {
 // authConnection asks a user for his login and password and checks if his own map
 // exists in storage, if not then it will be created.
 func (s *PotatoSlave) authConnection(connection net.Conn) (string, error) {
+
+	s.storageMutex.Lock()
+
 	if _, ok := s.storage["user"]; ok {
 	} else {
 		s.storage["user"] = make(map[string]potat)
 	}
+
+	s.storageMutex.Unlock()
 
 	return "user", nil
 }
@@ -173,7 +184,11 @@ func (s *PotatoSlave) del(userID string, mes CommandMessage) ResponseMessage {
 	if len(mes.Arguments) != 1 {
 		setStatus(&response, _WA)
 	} else {
+
+		s.storageMutex.Lock()
 		delete(s.storage[userID], mes.Arguments[0])
+		s.storageMutex.Unlock()
+
 		setStatus(&response, _OK)
 	}
 
@@ -188,9 +203,12 @@ func (s *PotatoSlave) keys(userID string, mes CommandMessage) ResponseMessage {
 		setStatus(&response, _WA)
 	} else {
 		ans := ""
+		s.storageMutex.Lock()
 		for k := range s.storage["user"] {
 			ans += "'" + k + "',"
 		}
+		s.storageMutex.Unlock()
+
 		response.Value = ans
 		setStatus(&response, _OK)
 	}
@@ -244,11 +262,15 @@ func (s *PotatoSlave) set(userID string, mes CommandMessage) ResponseMessage {
 
 		delete(s.storage[userID], mes.Arguments[0])
 
+		s.storageMutex.Unlock()
+
 		if mes.TTL != 0 {
 			ttl = mes.TTL
 		} else {
 			ttl = s.DEFAULTTTL
 		}
+
+		s.storageMutex.Lock()
 
 		s.storage[userID][mes.Arguments[0]] = &pstring{
 			content:     mes.Arguments[1],
@@ -256,7 +278,6 @@ func (s *PotatoSlave) set(userID string, mes CommandMessage) ResponseMessage {
 		}
 
 		s.storageMutex.Unlock()
-
 		setStatus(&response, _OK)
 	}
 
@@ -280,7 +301,10 @@ func (s *PotatoSlave) lpush(userID string, mes CommandMessage) ResponseMessage {
 			switch val.(type) {
 			case *plist:
 
+				s.storageMutex.Lock()
 				s.storage[userID][mes.Arguments[0]].setContent(mes.Arguments[1], "-1")
+				s.storageMutex.Unlock()
+
 				setStatus(&response, _OK)
 				return response
 
@@ -297,10 +321,15 @@ func (s *PotatoSlave) lpush(userID string, mes CommandMessage) ResponseMessage {
 			ttl = s.DEFAULTTTL
 		}
 
+		s.storageMutex.Lock()
+
 		s.storage[userID][mes.Arguments[0]] = &plist{
 			list:        []string{mes.Arguments[1]},
 			timeOfDeath: time.Now().Add(ttl),
 		}
+
+		s.storageMutex.Unlock()
+
 		setStatus(&response, _OK)
 	}
 
@@ -314,6 +343,8 @@ func (s *PotatoSlave) lset(userID string, mes CommandMessage) ResponseMessage {
 	if len(mes.Arguments) != 3 {
 		setStatus(&response, _WA)
 	} else {
+
+		s.storageMutex.Lock()
 
 		if val, ok := s.storage[userID][mes.Arguments[0]]; ok {
 
@@ -335,6 +366,7 @@ func (s *PotatoSlave) lset(userID string, mes CommandMessage) ResponseMessage {
 		} else {
 			setStatus(&response, _NK)
 		}
+		s.storageMutex.Unlock()
 	}
 
 	return response
@@ -347,6 +379,8 @@ func (s *PotatoSlave) lget(userID string, mes CommandMessage) ResponseMessage {
 	if len(mes.Arguments) != 2 {
 		setStatus(&response, _WA)
 	} else {
+
+		s.storageMutex.Lock()
 		if val, ok := s.storage[userID][mes.Arguments[0]]; ok {
 
 			switch val.(type) {
@@ -366,6 +400,7 @@ func (s *PotatoSlave) lget(userID string, mes CommandMessage) ResponseMessage {
 		} else {
 			setStatus(&response, _NK)
 		}
+		s.storageMutex.Unlock()
 	}
 
 	return response
@@ -380,6 +415,7 @@ func (s *PotatoSlave) hget(userID string, mes CommandMessage) ResponseMessage {
 	if len(mes.Arguments) != 2 {
 		setStatus(&response, _WA)
 	} else {
+		s.storageMutex.Lock()
 		if val, ok := s.storage[userID][mes.Arguments[0]]; ok {
 
 			switch val.(type) {
@@ -399,6 +435,7 @@ func (s *PotatoSlave) hget(userID string, mes CommandMessage) ResponseMessage {
 		} else {
 			setStatus(&response, _NK)
 		}
+		s.storageMutex.Unlock()
 	}
 	return response
 }
@@ -415,7 +452,9 @@ func (s *PotatoSlave) hset(userID string, mes CommandMessage) ResponseMessage {
 			switch val.(type) {
 			case *pmap:
 
+				s.storageMutex.Lock()
 				err := s.storage[userID][mes.Arguments[0]].setContent(mes.Arguments[2], mes.Arguments[1])
+				s.storageMutex.Unlock()
 
 				if err != nil {
 					setStatus(&response, _WA)
@@ -435,10 +474,14 @@ func (s *PotatoSlave) hset(userID string, mes CommandMessage) ResponseMessage {
 			ttl = s.DEFAULTTTL
 		}
 
+		s.storageMutex.Lock()
+
 		s.storage[userID][mes.Arguments[0]] = &pmap{
 			timeOfDeath: time.Now().Add(ttl),
 			ourmap:      map[string]string{mes.Arguments[2]: mes.Arguments[1]},
 		}
+
+		s.storageMutex.Unlock()
 
 	}
 
