@@ -12,6 +12,7 @@ func main() {
 	serv.Connect("localhost:65000")
 
 	// String
+	fmt.Println("Testing strings...")
 	serv.Set("newstr", "value", time.Hour)
 	fmt.Println(serv.Get("newstr"))
 	serv.Set("superstr", "value", time.Hour)
@@ -20,6 +21,7 @@ func main() {
 	fmt.Println(serv.Keys())
 
 	// List
+	fmt.Println("Testing lists...")
 	serv.Lpush("mylist", "5", time.Hour)
 	serv.Lpush("mylist", "10", time.Hour)
 	serv.Lpush("mylist", "15", time.Hour)
@@ -30,10 +32,12 @@ func main() {
 	serv.Lset("mylist", 100, "22")
 
 	// Map
+	fmt.Println("Testing map...")
 	serv.Hset("myhash", "max", "boy", time.Hour)
 	serv.Hset("myhash", "nastya", "girl", time.Hour)
 	fmt.Println(serv.Hget("myhash", "max"))
 	//TTL
+	fmt.Println("Testing ttl...")
 	fmt.Println(serv.Keys())
 	serv.Set("shortLiver", "value", time.Millisecond)
 	fmt.Println(serv.Keys())

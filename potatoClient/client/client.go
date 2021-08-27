@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -47,7 +46,7 @@ func (s *Server) Get(key string) string {
 		Arguments: []string{key},
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 	return s.response.Value
 }
 
@@ -59,7 +58,7 @@ func (s *Server) Set(key string, value string, ttl time.Duration) {
 		TTL:       ttl,
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 }
 
 // Del
@@ -69,7 +68,7 @@ func (s *Server) Del(key string) {
 		Arguments: []string{key},
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 }
 
 // Keys
@@ -78,7 +77,7 @@ func (s *Server) Keys() string {
 		Name: "KEYS",
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 	return s.response.Value
 }
 
@@ -90,7 +89,7 @@ func (s *Server) Lpush(key string, val string, ttl time.Duration) {
 		TTL:       ttl,
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 }
 
 // Lget
@@ -100,7 +99,7 @@ func (s *Server) Lget(key string, position int) string {
 		Arguments: []string{key, strconv.Itoa(position)},
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 	return s.response.Value
 }
 
@@ -111,7 +110,7 @@ func (s *Server) Lset(key string, position int, val string) {
 		Arguments: []string{key, strconv.Itoa(position), val},
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 }
 
 // Hget
@@ -121,7 +120,7 @@ func (s *Server) Hget(key string, innerKey string) string {
 		Arguments: []string{key, innerKey},
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 	return s.response.Value
 }
 
@@ -133,5 +132,5 @@ func (s *Server) Hset(key string, innerKey string, val string, ttl time.Duration
 		TTL:       ttl,
 	})
 	s.decoder.Decode(&s.response)
-	fmt.Println(s.response.StatusMessage)
+	//fmt.Println(s.response.StatusMessage)
 }
